@@ -7,15 +7,15 @@ int main () {
 	formula f ("");
 	double y, z;
 	cin >> y >> z;
-	f.sequence = {
-		formula::pushi,
+	f.seq = {
+		formula::PUSHI,
 		bit_cast <uint64_t, double> (20.6232),
-		formula::pushm,
+		formula::PUSHM,
 		bit_cast <uint64_t, double*> (&y),
-		formula::pushm,
+		formula::PUSHM,
 		bit_cast <uint64_t, double*> (&z),
-		formula::div,
-		formula::sub
+		formula::DIV,
+		formula::SUB
 	};
 
 	auto e = formula::parse_error ("wer", "wegvin");

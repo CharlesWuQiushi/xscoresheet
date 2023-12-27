@@ -11,6 +11,7 @@
 #include <set>
 #include <unordered_set>
 
+#include <functional>
 #include <utility>
 #include <cmath>
 #include <regex>
