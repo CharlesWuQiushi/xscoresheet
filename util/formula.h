@@ -143,8 +143,8 @@ public:
 				case MUL: --pt; *pt *= pt[1]; break;
 				case DIV: --pt; *pt /= pt[1]; break;
 				case POW: --pt; *pt = std::pow (*pt, pt[1]); break;
-				case MAX: --pt; *pt = std::MAX (*pt, pt[1]); break;
-				case MIN: --pt; *pt = std::MIN (*pt, pt[1]); break;
+				case MAX: --pt; *pt = std::max (*pt, pt[1]); break;
+				case MIN: --pt; *pt = std::min (*pt, pt[1]); break;
 				case PUSHI: *++pt = to_immediate (*++it); break;
 				case PUSHM: *++pt = *to_pointer (*++it); break;
 				case MOV: *to_pointer (*++it) = *pt; break;
