@@ -1,21 +1,27 @@
 #pragma once
 
+#include <cstring>
+
 #include <string>
 #include <vector>
+#include <array>
+
 #include <map>
 #include <unordered_map>
 #include <set>
 #include <unordered_set>
-#include <utility>
 
+#include <utility>
+#include <cmath>
 #include <regex>
 #include <chrono>
 
-namespace xscoresheet {
+#include <exception>
+#include "fmt/core.h"
+#include "fmt/format.h"
 
-using std::string, std::vector, std::pair, std::tuple;
-using std::unordered_map, std::map, std::set, std::unordered_set;
-using std::regex;
-using namespace std::chrono;
+namespace xscoresheet {
+using std::string, std::vector, std::array;
+using std::tuple, std::pair;
 
 }

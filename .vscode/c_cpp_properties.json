@@ -3,13 +3,13 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
                 "pkg"
             ],
             "defines": [
                 "_DEBUG",
                 "UNICODE",
-                "_UNICODE"
+                "_UNICODE",
+                "SPDLOG_FMT_EXTERNAL"
             ],
             "compilerPath": "C:\\msys\\mingw64\\bin\\g++.exe",
             "cStandard": "c17",
