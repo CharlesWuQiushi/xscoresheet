@@ -22,6 +22,13 @@ struct converter {
 				fmt::format ("格式串 “{}”；公式：{}", p.get_pattern (), f.get_formula ()));
 		return f (p (text));
 	}
+
+private:
+	friend class cereal::access;
+	template <class archive>
+	void serialize (archive &a) {
+		a (p, f);
+	}
 };
 
 }

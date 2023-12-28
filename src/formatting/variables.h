@@ -1,11 +1,16 @@
 #pragma once
 
 #include "__config.h"
+
+#include <array>
 #include <bitset>
+
+#include "cereal/types/array.hpp"
+#include "cereal/types/bitset.hpp"
 
 namespace xscoresheet::formatting {
 
-struct variables : array <double, 52> {
+struct variables : std::array <double, 52> {
 	variables () { fill (NAN); };
 	variables (const variables&) = default;
 	variables (variables&&) = default;

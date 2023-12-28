@@ -23,8 +23,7 @@ public:
 
 	using mask_t = variable_mask;
 	pattern () = default;
-	pattern (string pat) : re (), mask (0), pat (pat), perm ("") {
-		string t = "";
+	pattern (const string &p) : re (), mask (0), pat (p), t (""), perm ("") {
 		const string re_int = "([+-]?[0-9]+)",
 			re_float = "([+-]?(?:[0-9]+(?:[.][0-9]*)?)|(?:[.][0-9]+))";
 		constexpr char esc[] = ".^$*+?()[{\\|-]";
@@ -46,6 +45,10 @@ public:
 			}
 		re = std::regex (t);
 	}
+	pattern (const pattern&) = default;
+	pattern (pattern&&) = default;
+	pattern& operator = (const pattern&) = default;
+	pattern& operator = (pattern&&) = default;
 
 	variables operator () (string text) const {
 		std::smatch res;
@@ -66,7 +69,18 @@ public:
 private:
 	std::regex re;
 	mask_t mask;
-	string pat, perm;
+	string pat, t, perm;
+
+	friend class cereal::access;
+	template <class archive>
+	void save (archive &a) const {
+		a (mask, pat, t, perm);
+	}
+	template <class archive>
+	void load (archive &a) {
+		a (mask, pat, t, perm);
+		re.assign (t);
+	}
 };
 
 }
