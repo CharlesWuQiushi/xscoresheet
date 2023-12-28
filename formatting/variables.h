@@ -1,7 +1,7 @@
 #include "__config.h"
 #include <bitset>
 
-namespace xscoresheet {
+namespace xscoresheet::formatting {
 
 struct variables : array <double, 52> {
 	variables () { fill (NAN); };

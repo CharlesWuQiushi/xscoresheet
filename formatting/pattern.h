@@ -1,10 +1,10 @@
 #include "__config.h"
-#include "error.h"
+#include "err.h"
 #include "variables.h"
 
 #include <regex>
 
-namespace xscoresheet {
+namespace xscoresheet::formatting {
 
 class pattern {
 public:
