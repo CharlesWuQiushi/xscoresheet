@@ -5,7 +5,7 @@ int main () {
 	for (int i = 0, c = getchar (); c != '\n'; s[i++] = c, c = getchar ());
 	double a; int dt;
 	int x = sscanf (s, "%lf%n", &a, &dt);
-	printf ("%d %lf\n", dt, a);
+	printf ("%d %d %lf\n", x, dt, a);
 
 	return 0;
 }

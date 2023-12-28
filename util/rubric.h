@@ -1,4 +1,6 @@
 #include "__config.h"
+#include <regex>
+#include <chrono>
 
 namespace xscoresheet {
 struct rubric {

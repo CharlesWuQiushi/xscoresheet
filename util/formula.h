@@ -3,21 +3,26 @@
 #include "__config.h"
 #include "error.h"
 
+#include <functional>
+#include <cmath>
+
 namespace xscoresheet {
 
 class formula {
 public:
+	using mask_t = uint64_t;
 	struct variables : array <double, 52> {
 		variables () { fill (NAN); };
 		variables (const variables&) = default;
-		variables (const variables&&) = default;
+		variables (variables&&) = default;
 		variables& operator = (const variables&) = default;
-		variables& operator = (const variables&&) = default;
+		variables& operator = (variables&&) = default;
+
 		static size_t encode (char c) {
-			return c >= 'a' ? c - 'a' : c - 'A' + 26;
+			return c >= 'a' && c <= 'z' ? c - 'a' : c >= 'A' && c <= 'Z' ? c - 'A' + 26 : 52;
 		}
 		static char decode (size_t k) {
-			return k < 26 ? 'a' + k : 'A' + k - 26;
+			return k < 26 ? 'a' + k : k < 52 ? 'A' + k - 26 : 0;
 		}
 		double& operator () (char c) {
 			return (*this)[encode (c)];
@@ -26,52 +31,7 @@ public:
 			return (*this)[encode (c)];
 		}
 	};
-
-	enum class operation {
-		ADD,
-		SUB,
-		MUL,
-		DIV,
-		POW,
-		MAX,
-		MIN,
-		PUSHI,
-		PUSHM,
-		MOV,
-		NEG,
-		NOP
-	};
-	static constexpr int precedence (operation op) {
-		using enum operation;
-		switch (op) {
-			case NEG: return 4;
-			case POW: return 3;
-			case MUL: case DIV: return 2;
-			case ADD: case SUB: return 1;
-			default: return 0;
-		}
-	}
-	static constexpr int operand_count (operation op) {
-		using enum operation;
-		switch (op) {
-			case NOP: return 0;
-			case NEG: case PUSHI: case PUSHM: return 1;
-			case ADD: case SUB: case MUL: case DIV: case POW: case MOV: return 2;
-			default: return 3;
-		}
-	}
-	static constexpr operation encode_op (char c, bool single = false) {
-		using enum operation;
-		if (single) return c == '-' ? NEG : NOP;
-		switch (c) {
-			case '-': SUB;
-			case '+': return ADD;
-			case '*': return MUL;
-			case '/': return DIV;
-			case '^': return POW;
-			default: return NOP;
-		}
-	}
+	mask_t mask;
 
 	class parse_error : public error {
 	public:
@@ -81,81 +41,186 @@ public:
 
 private:
 	using code_t = uint64_t;
-	using mask_t = uint64_t;
 	using sequence = vector <code_t>;
-	static constexpr size_t STACK_SIZE = 256;
+	static constexpr size_t stack_size = 256;
 
-	static double stack[STACK_SIZE];
+	enum class instruction : code_t {
+		nop,
+		add,
+		sub,
+		mul,
+		div,
+		pow,
+		max,
+		min,
+		pushi,
+		pushm,
+		mov,
+		neg
+	};
+	enum class math_operator : code_t {
+		plus = (size_t) instruction::add,
+		minus = (size_t) instruction::sub,
+		multiplies = (size_t) instruction::mul,
+		divides = (size_t) instruction::div,
+		power = (size_t) instruction::pow,
+		negate = (size_t) instruction::neg,
+		null = (size_t) instruction::nop
+	};
+	enum class associativity {
+		left,
+		right
+	};
+	enum class arity : size_t {
+		nullary = 0,
+		unary = 1,
+		binary = 2
+	};
+	static size_t get_precedence (math_operator op) {
+		using enum math_operator;
+		switch (op) {
+			case negate: return 4;
+			case power: return 3;
+			case multiplies: case divides: return 2;
+			case plus: case minus: return 1;
+			default: return 0;
+		}
+	}
+	static arity get_arity (math_operator op) {
+		using enum math_operator;
+		using enum arity;
+		switch (op) {
+			case null: return nullary;
+			case negate: return unary;
+			default: return binary;
+		}
+	}
+	static int32_t get_delta (instruction op) {
+		using enum instruction;
+		switch (op) {
+			case pushi: case pushm: return 1;
+			case nop: case mov: case neg: return 0;
+			default: return -1;
+		}
+	}
+	static associativity get_associativity (math_operator op) {
+		using enum math_operator;
+		using enum associativity;
+		switch (op) {
+			case negate: case power: return right;
+			default: return left;
+		}
+	}
+	static math_operator encode_operator (char c, bool single = 0) {
+		using enum math_operator;
+		if (single) return c == '-' ? negate : null;
+		switch (c) {
+			case '-': return minus;
+			case '+': return plus;
+			case '*': return multiplies;
+			case '/': return divides;
+			case '^': return power;
+			default: return null;
+		}
+	}
+
+	static double stack[stack_size];
 	static variables vars;
 	sequence seq;
-	mask_t mask;
 
 public:
-	formula (const string &s) : seq {}, mask (0) {
-		static operation op_s[STACK_SIZE];
+	formula () = default;
+	formula (const string &s) : mask (0), seq {} {
+		using enum instruction;
+		using enum math_operator;
+		static math_operator op_s[stack_size];
 		size_t num_c = 0, op_c = 0;
 		auto it = s.c_str ();
 
-		std::function <void (size_t, size_t, size_t)> read;
-		read = [&] (size_t op_c0, size_t num_c0, size_t layer) {
+		std::function <void (size_t, size_t, size_t, bool)> read;
+		read = [&] (size_t op_c0, size_t num_c0, size_t layer, bool multi_arg) {
 			bool last_is_op = 1;
+			auto push_instr = [&] (instruction instr) {
+				seq.push_back ((code_t) instr);
+				num_c += get_delta (instr);
+			};
+			auto push_imm = [&] (double a) {
+				push_instr (pushi);
+				seq.push_back (std::bit_cast <code_t, double> (a));
+				last_is_op = 0;
+			};
+			auto push_mem = [&] (double *pt) {
+				push_instr (pushm);
+				seq.push_back (std::bit_cast <code_t, double*> (pt));
+				last_is_op = 0;
+			};
+			auto pop_op = [&] () {
+				push_instr ((instruction) op_s[--op_c]);
+			};
+			auto has_op = [&] () { return op_c > op_c0; };
+			auto append_op = [&] (math_operator op) {
+				op_s[op_c++] = op;
+				last_is_op = 1;
+			};
+			auto top_op = [&] () { return op_s[op_c - 1]; };
 
 			auto read_var = [&] () {
+				if (!last_is_op) throw parse_error ("连续输入了多个数字或变量。", s);
 				char c = *++it;
 				if (!isalpha (c) || (*++it && (isalpha (*it) || isdigit (*it))))
 					throw parse_error ("输入了 `$`，但其后没有紧跟单个英文字母。", s);
 				mask |= (mask_t) 1 << variables::encode (c);
-				seq.push_back ((code_t) operation::PUSHM);
-				seq.push_back ((code_t) &vars (c));
-				++num_c;
+				push_mem (&vars (c));
 			};
 			auto read_num = [&] () {
-				if (!last_is_op) throw parse_error ("连续输入了多个数字。", s);
-				int len; double a;
-				sscanf (it, "%lf%n", &a, &len);
+				if (!last_is_op) throw parse_error ("连续输入了多个数字或变量。", s);
+				size_t len; double a;
+				if (!sscanf (it, "%lf%zn", &a, &len))
+					throw parse_error ("输入了小数点，但不是有效的浮点数。", s);
 				it += len;
-				seq.push_back ((code_t) operation::PUSHI);
-				seq.push_back (std::bit_cast <code_t, double> (a));
-				last_is_op = 0;
+				push_imm (a);
 			};
 			auto read_op = [&] () {
-				operation op = encode_op (*it++, last_is_op), _op;
-				const auto p = precedence (op);
-				if (op == operation::NOP)
+				math_operator op = encode_operator (*it++, last_is_op);
+				const auto p = get_precedence (op);
+				if (op == null)
 					throw parse_error ("输入了多余的运算符。", s);
-				while (op_c > op_c0 && precedence (_op = op_s[op_c - 1]) > p) {
-					seq.push_back ((code_t) _op);
-					num_c -= operand_count (_op) - 1;
-					--op_c;
-				}
-				if (op_c > op_c0 && precedence (_op) == p) {
-					if (_op == operation::NEG) --op_c;
-					else {
-						seq.push_back ((code_t) op_s[--op_c]), --num_c;
-						op_s[op_c++] = op;
-					}
-				}
-				last_is_op = 1;
+				while (has_op () && get_precedence (top_op ()) > p)
+					pop_op ();
+				if (has_op () && get_precedence (top_op ()) == p
+					&& get_associativity (op) == associativity::left)
+					pop_op ();
+				append_op (op);
 			};
 			auto read_func = [&] () {
-				string fun_name = "";
+				string name = "";
 				while (isalpha (*it) || isdigit (*it))
-					fun_name += *it++;
-				if (fun_name == "max") {
-					
-				} else if (fun_name == "min") {
-
-				} else if (fun_name == "average") {
-
-				} else {
-					throw parse_error ("输入了无效的函数名。");
-				}
+					name += *it++;
+				while (isspace (*it)) ++it;
+				if (*it != '(')
+					throw parse_error ("未在函数名后紧跟输入由小括号括起的参数列表。", s);
+				++it;
+				const auto num_c1 = num_c;
+				read (num_c, op_c, layer + 1, 1);
+				auto argc = num_c - num_c1;
+				if (name == "max") {
+					for (size_t i = 1; i < argc; ++i)
+						push_instr (max);
+				} else if (name == "min") {
+					for (size_t i = 1; i < argc; ++i)
+						push_instr (min);
+				} else if (name == "average") {
+					for (size_t i = 1; i < argc; ++i)
+						push_instr (add);
+					push_imm (argc);
+					append_op (divides);
+				} else throw parse_error ("输入了无效的函数名。", s);
 			};
 
 			while (*it) {
 				if (*it == '$') {
 					read_var ();
-				} else if (precedence (encode_op (*it))) {
+				} else if (encode_operator (*it) != null) {
 					read_op ();
 				} else if (isalpha (*it)) {
 					read_func ();
@@ -164,44 +229,56 @@ public:
 				} else if (isspace (*it)) {
 					++it; continue;
 				} else if (*it == ',') {
-					if (layer == 0)
-						throw parse_error ("在最外层表达式输入了 `,`。", s);
-					return ++it, read (op_c, num_c, layer);
+					if (!multi_arg)
+						throw parse_error ("只有函数调用的括号内部可存在多个用 `,` 分隔的表达式。", s);
+					while (has_op ()) pop_op ();
+					return ++it, read (op_c, num_c, layer, multi_arg);
 				} else if (*it == '(') {
-					const auto _num_c = num_c;
-					read (op_c, num_c, layer + 1);
-					if (num_c != _num_c + 1)
-						throw parse_error ("输入了一对内部不是恰好一条表达式的括号。", s);
+					++it; read (op_c, num_c, layer + 1, 0);
+					last_is_op = 0;
 				} else if (*it == ')') {
 					if (layer == 0)
-						throw parse_error ("输入了多余的右括号。", s);
+						throw parse_error ("输入了未匹配的右括号。", s);
 					break;
 				} else {
 					throw parse_error ("输入了非法字符。", s);
 				}
 			}
+			if (*it == 0) {
+				if (layer > 0)
+					throw parse_error ("输入了未匹配的左括号。", s);
+			} else ++it;
+			while (has_op ()) pop_op ();
+			if (num_c == num_c0)
+				throw parse_error ("子表达式需含有至少一个参数。", s);
 		};
+		read (0, 0, 0, 0);
 	}
+	formula (const formula&) = default;
+	formula (formula&&) = default;
+	formula& operator = (const formula&) = default;
+	formula& operator = (formula&&) = default;
 
 	double operator () (const variables& args) const {
-		using enum operation;
+		using enum instruction;
+		vars = args;
 		double *pt = stack;
 		auto it = std::begin (seq);
 		const auto to_pointer = std::bit_cast <double*, code_t>;
 		const auto to_immediate = std::bit_cast <double, code_t>;
 		while (it != std::end (seq)) {
-			switch ((operation) *it) {
-				case ADD: --pt; *pt += pt[1]; break;
-				case SUB: --pt; *pt -= pt[1]; break;
-				case MUL: --pt; *pt *= pt[1]; break;
-				case DIV: --pt; *pt /= pt[1]; break;
-				case POW: --pt; *pt = std::pow (*pt, pt[1]); break;
-				case MAX: --pt; *pt = std::max (*pt, pt[1]); break;
-				case MIN: --pt; *pt = std::min (*pt, pt[1]); break;
-				case PUSHI: *++pt = to_immediate (*++it); break;
-				case PUSHM: *++pt = *to_pointer (*++it); break;
-				case MOV: *to_pointer (*++it) = *pt; break;
-				case NEG: *pt = -*pt; break;
+			switch ((instruction) *it) {
+				case add: --pt; *pt += pt[1]; break;
+				case sub: --pt; *pt -= pt[1]; break;
+				case mul: --pt; *pt *= pt[1]; break;
+				case div: --pt; *pt /= pt[1]; break;
+				case pow: --pt; *pt = std::pow (*pt, pt[1]); break;
+				case max: --pt; *pt = std::max (*pt, pt[1]); break;
+				case min: --pt; *pt = std::min (*pt, pt[1]); break;
+				case pushi: *++pt = to_immediate (*++it); break;
+				case pushm: *++pt = *to_pointer (*++it); break;
+				case mov: *to_pointer (*++it) = *pt; break;
+				case neg: *pt = -*pt; break;
 			}
 			++it;
 		}
