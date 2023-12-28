@@ -2,6 +2,7 @@
 
 #include "__config.h"
 #include "error.h"
+#include "variables.h"
 
 #include <functional>
 #include <cmath>
@@ -10,7 +11,7 @@ namespace xscoresheet {
 
 class formula {
 public:
-	using mask_t = uint64_t;
+	using mask_t = variable_mask;
 	struct variables : array <double, 52> {
 		variables () { fill (NAN); };
 		variables (const variables&) = default;
@@ -36,7 +37,7 @@ public:
 	class parse_error : public error {
 	public:
 		parse_error (const string &msg, const string &info = "")
-			: error ("公式解析器", msg, info) {}
+			: error ("公式解析器", "解析公式时发生错误：" + msg, info) {}
 	};
 
 private:
@@ -56,6 +57,10 @@ private:
 		pushi,
 		pushm,
 		mov,
+		ceil,
+		floor,
+		round,
+		abs,
 		neg
 	};
 	enum class math_operator : code_t {
@@ -99,7 +104,8 @@ private:
 		using enum instruction;
 		switch (op) {
 			case pushi: case pushm: return 1;
-			case nop: case mov: case neg: return 0;
+			case nop: case mov: case neg: case abs:
+			case ceil: case floor: case round: return 0;
 			default: return -1;
 		}
 	}
@@ -202,8 +208,19 @@ public:
 				++it;
 				const auto num_c1 = num_c;
 				read (num_c, op_c, layer + 1, 1);
-				auto argc = num_c - num_c1;
-				if (name == "max") {
+				const auto argc = num_c - num_c1;
+				if (argc != 1 && (name == "ceil" || name == "floor"
+					|| name == "round" || name == "abs"))
+					throw parse_error (name + " 是单变量函数。", s);
+				if (name == "ceil") {
+					push_instr (ceil);
+				} else if (name == "floor") {
+					push_instr (floor);
+				} else if (name == "abs") {
+					push_instr (abs);
+				} else if (name == "round") {
+					push_instr (round);
+				} else if (name == "max") {
 					for (size_t i = 1; i < argc; ++i)
 						push_instr (max);
 				} else if (name == "min") {
@@ -279,6 +296,11 @@ public:
 				case pushm: *++pt = *to_pointer (*++it); break;
 				case mov: *to_pointer (*++it) = *pt; break;
 				case neg: *pt = -*pt; break;
+				case abs: *pt = std::abs (*pt); break;
+				case ceil: *pt = std::ceil (*pt); break;
+				case floor: *pt = std::floor (*pt); break;
+				case round: *pt = std::round (*pt); break;
+				case nop: break;
 			}
 			++it;
 		}

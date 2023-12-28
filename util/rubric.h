@@ -1,5 +1,4 @@
 #include "__config.h"
-#include <regex>
 #include <chrono>
 
 namespace xscoresheet {
@@ -7,12 +6,10 @@ struct rubric {
 	struct sport {
 		string name, note;
 		double full_score;
-		enum {
-			LESS_EQUAL,
-			GREATER_EQUAL,
-			MINIMUM,
-			MAXIMUM
-		} comparator;
+		enum struct comparator {
+			less_equal,
+			greater_equal
+		};
 	};
 	struct guide {
 		string sport_name;
