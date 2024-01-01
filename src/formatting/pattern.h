@@ -2,7 +2,7 @@
 
 #include "__config.h"
 #include "err.h"
-#include "variables.h"
+#include "formatting/variables.h"
 
 #include <regex>
 
@@ -12,19 +12,19 @@ class pattern {
 public:
 	class parse_error : public error {
 	public:
-		parse_error (const string &msg, const string &info = "")
+		parse_error (const std::string &msg, const std::string &info = "")
 			: error ("格式串解析器", "解析格式串时发生错误：" + msg, info) {}
 	};
 	class match_error : public error {
 	public:
-		match_error (const string &msg, const string &info = "")
+		match_error (const std::string &msg, const std::string &info = "")
 			: error ("格式串解析器", "将格式串和输入匹配时发生错误：" + msg, info) {}
 	};
 
 	using mask_t = variable_mask;
 	pattern () = default;
-	pattern (const string &p) : re (), mask (0), pat (p), t (""), perm ("") {
-		const string re_int = "([+-]?[0-9]+)",
+	pattern (const std::string &p) : re (), mask (0), pat (p), t (""), perm ("") {
+		const std::string re_int = "([+-]?[0-9]+)",
 			re_float = "([+-]?(?:[0-9]+(?:[.][0-9]*)?)|(?:[.][0-9]+))";
 		constexpr char esc[] = ".^$*+?()[{\\|-]";
 		pat = std::regex_replace (pat, std::regex ("^ +"), "");
@@ -33,7 +33,7 @@ public:
 			if (*it == '$' && isalpha (it[1])) {
 				const char c = *++it;
 				if (mask (c))
-					throw parse_error ("变量 $"s + c + " 出现了多次。", pat);
+					throw parse_error (fmt::format ("变量 ${} 出现了多次。", c), pat);
 				mask (c) = 1;
 				if (isupper (c)) t += re_int;
 				else t += re_float;
@@ -50,7 +50,7 @@ public:
 	pattern& operator = (const pattern&) = default;
 	pattern& operator = (pattern&&) = default;
 
-	variables operator () (string text) const {
+	variables operator () (std::string text) const {
 		std::smatch res;
 		text = std::regex_replace (text, std::regex ("^\\s+"), "");
 		text = std::regex_replace (text, std::regex ("\\s+$"), "");
@@ -64,12 +64,12 @@ public:
 		return vars;
 	}
 	mask_t var_mask () const { return mask; }
-	string get_pattern () const { return pat; }
+	std::string string () const { return pat; }
 
 private:
 	std::regex re;
 	mask_t mask;
-	string pat, t, perm;
+	std::string pat, t, perm;
 
 	friend class cereal::access;
 	template <class archive>

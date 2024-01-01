@@ -2,7 +2,7 @@
 
 #include "__config.h"
 #include "err.h"
-#include "variables.h"
+#include "formatting/variables.h"
 
 #include <functional>
 #include <cmath>
@@ -12,7 +12,7 @@ namespace xscoresheet::formatting {
 class formula {
 	using mask_t = variable_mask;
 	using code_t = uint64_t;
-	using sequence = vector <code_t>;
+	using sequence = std::vector <code_t>;
 	static constexpr size_t stack_size = 256;
 
 	enum class instruction : code_t {
@@ -45,7 +45,7 @@ class formula {
 		left = 0,
 		right = 1
 	};
-	enum class arity : size_t {
+	enum class arity {
 		nullary = 0,
 		unary = 1,
 		binary = 2
@@ -102,7 +102,7 @@ class formula {
 	static double stack[stack_size];
 	static variables vars;
 	sequence seq;
-	string f_str;
+	std::string f_str;
 	mask_t mask;
 
 	friend class cereal::access;
@@ -114,12 +114,12 @@ class formula {
 public:
 	class parse_error : public error {
 	public:
-		parse_error (const string &msg, const string &info = "")
+		parse_error (const std::string &msg, const std::string &info = "")
 			: error ("公式解析器", "解析公式时发生错误：" + msg, info) {}
 	};
 
 	formula () = default;
-	formula (const string &s) : mask (0), seq {}, f_str (s) {
+	formula (const std::string &s) : mask (0), seq {}, f_str (s) {
 		using enum instruction;
 		using enum math_operator;
 		static math_operator op_s[stack_size];
@@ -182,7 +182,7 @@ public:
 				append_op (op);
 			};
 			auto read_func = [&] () {
-				string name = "";
+				std::string name = "";
 				while (isalpha (*it) || isdigit (*it))
 					name += *it++;
 				while (isspace (*it)) ++it;
@@ -288,7 +288,7 @@ public:
 		return *pt;
 	}
 	mask_t var_mask () const { return mask; }
-	string get_formula () const { return f_str; }
+	std::string string () const { return f_str; }
 };
 double formula::stack[];
 variables formula::vars;

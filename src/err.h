@@ -8,7 +8,7 @@ namespace xscoresheet {
 
 class error : public std::runtime_error {
 public:
-	explicit error (const string &loc, const string &msg, const string &info = "")
+	explicit error (const std::string &loc, const std::string &msg, const std::string &info = "")
 		: std::runtime_error (fmt::format ("[{}] {} {}", loc, msg, info == "" ? "" : "（" + info + "）")) {
 		// TODO: logging.
 	}

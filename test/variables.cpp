@@ -1,4 +1,4 @@
-#include "variables.h"
+#include "formatting/variables.h"
 #include <iostream>
 using namespace xscoresheet;
 

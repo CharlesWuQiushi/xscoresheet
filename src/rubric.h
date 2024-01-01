@@ -3,8 +3,10 @@
 #include "__config.h"
 #include "formatting/converter.h"
 
+#include <unordered_map>
 #include <chrono>
 
+#include "cereal/types/unordered_map.hpp"
 #include "cereal/types/chrono.hpp"
 
 namespace xscoresheet {
@@ -14,11 +16,12 @@ class rubric {
 
 public:
 	struct sport {
-		string name, note, unit;
+		std::string name, note, unit;
 		double full_score;
 		enum struct comparator {
 			less_equal,
-			greater_equal
+			greater_equal,
+			equal
 		} comp;
 	private:
 		friend class cereal::access;
@@ -29,10 +32,10 @@ public:
 	};
 
 	struct table {
-		string sport_name;
-		unordered_map <string, string> properties;
+		std::string sport_name;
+		std::unordered_map <std::string, std::string> properties;
 		struct entry {
-			string data;
+			std::string data;
 			double score;
 		private:
 			friend class cereal::access;
@@ -41,7 +44,7 @@ public:
 				a (data, score);
 			}
 		};
-		vector <entry> entries;
+		std::vector <entry> entries;
 		formatting::converter conv;
 	private:
 		friend class cereal::access;
@@ -51,10 +54,10 @@ public:
 		}
 	};
 
-	string name, note;
+	std::string name, note;
 	time_point created, modified;
-	vector <sport> sports;
-	vector <table> tables;
+	std::vector <sport> sports;
+	std::vector <table> tables;
 
 private:
 	friend class cereal::access;

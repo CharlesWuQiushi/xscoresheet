@@ -93,6 +93,7 @@
 		"typeindex": "cpp",
 		"valarray": "cpp",
 		"*.inc": "cpp",
-		"*.def": "cpp"
+		"*.def": "cpp",
+		"parser": "cpp"
 	}
 }
